@@ -1,0 +1,78 @@
+
+version: '3.8'
+
+services:
+  # Base de Dados Unificada
+  vizzu-db:
+    image: postgres:15-alpine
+    container_name: vizzu_db
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+    volumes:
+      - vizzu_postgres_data:/var/lib/postgresql/data
+    restart: always
+
+  # Zabbix Server
+  zabbix-server:
+    image: zabbix/zabbix-server-pgsql:ubuntu-6.4-latest
+    container_name: zabbix_server
+    ports:
+      - "10051:10051"
+    environment:
+      - DB_SERVER_HOST=vizzu-db
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+    depends_on:
+      - vizzu-db
+    restart: always
+
+  # Zabbix Web (Interface Necessária para a API funcionar)
+  zabbix-web:
+    image: zabbix/zabbix-web-nginx-pgsql:ubuntu-6.4-latest
+    container_name: zabbix_web
+    ports:
+      - "8080:8080"
+    environment:
+      - ZBX_SERVER_HOST=zabbix-server
+      - DB_SERVER_HOST=vizzu-db
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+    restart: always
+
+  # Grafana com Plugin Zabbix
+  grafana:
+    image: grafana/grafana:latest
+    container_name: vizzu_grafana
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning
+      - vizzu_grafana_data:/var/lib/grafana
+    environment:
+      - GF_INSTALL_PLUGINS=alexanderzobnin-zabbix-app
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s:%(http_port)s/grafana/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+    restart: always
+
+  # Vizzu SaaS App
+  vizzu-app:
+    build: .
+    container_name: vizzu_app
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@vizzu-db:5432/${DB_NAME}
+      - JWT_SECRET=${JWT_SECRET}
+      - ZABBIX_API_URL=http://zabbix-web:8080/api_jsonrpc.php
+    depends_on:
+      - vizzu-db
+    restart: always
+
+volumes:
+  vizzu_postgres_data:
+  vizzu_grafana_data:

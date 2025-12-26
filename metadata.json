@@ -1,0 +1,9 @@
+
+{
+  "name": "VIZZU - Monitoramento SaaS Enterprise",
+  "description": "Plataforma SaaS completa para monitoramento com Zabbix, Grafana e gestão financeira integrada.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
